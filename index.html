@@ -340,8 +340,9 @@
                     timestamp: new Date().toLocaleString()
                 };
 
-                if (tg && tg.initData && tg.initData.length > 0) {
+                if (tg && typeof tg.sendData === 'function') {
                     tg.sendData(JSON.stringify(data));
+                    showToast(translations[currentLang].success || "✅ Order Sent!");
                 } else {
                     showToast("⚠️ ቴሌግራም ውስጥ ብቻ ይሰራል!", true);
                     btn.disabled = false;
