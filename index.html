@@ -316,30 +316,34 @@
         }
 
         async function handleSubmit(e) {
-            e.preventDefault();
-            const btn = document.getElementById('submit-btn');
-            const val = parseFloat(document.getElementById('input-amount').value);
+    e.preventDefault();
+    const btn = document.getElementById('submit-btn');
+    const val = parseFloat(document.getElementById('input-amount').value);
 
-            if (val < 7) return showToast("Minimum 7 USDT", true);
-            if (!base64Image) return showToast("እባክዎ መጀመሪያ ደረሰኝ ያያይዙ", true);
+    if (val < 7) return showToast("Minimum 7 USDT", true);
+    if (!base64Image) return showToast("እባክዎ መጀመሪያ ደረሰኝ ያያይዙ", true);
 
-            btn.disabled = true;
-            btn.innerText = "� ትዕዛዙን በመላክ ላይ...";
+    btn.disabled = true;
+    btn.innerText = "📨 ትዕዛዙን በመላክ ላይ...";
 
-            try {
-                // Backend ምስሉን ImgBB ላይ ይገባ - ከ base64 ብቻ ይላክ
-                const data = {
-                    type: currentMode.toUpperCase(),
-                    name: document.getElementById('input-name').value,
-                    phone: document.getElementById('input-phone').value,
-                    usdt_amount: val,
-                    etb_total: document.getElementById('total-display').innerText,
-                    wallet: currentMode === 'buy' ? document.getElementById('target-id').value : 'N/A',
-                    telebirr: currentMode === 'sell' ? document.getElementById('target-id').value : 'N/A',
-                    receipt_base64: base64Image.split(',')[1], // Base64 ብቻ ላክ - API ቁልፉ backend ውስጥ ነው
-                    timestamp: new Date().toLocaleString()
-                };
+    // ለቦቱ የሚላክ ዳታ (ምንም ቁልፍ እዚህ የለም!)
+    const data = {
+        type: currentMode.toUpperCase(),
+        name: document.getElementById('input-name').value,
+        phone: document.getElementById('input-phone').value,
+        usdt_amount: val,
+        etb_total: document.getElementById('total-display').innerText,
+        wallet: currentMode === 'buy' ? document.getElementById('target-id').value : 'N/A',
+        telebirr: currentMode === 'sell' ? document.getElementById('target-id').value : 'N/A',
+        receipt_data: base64Image.split(',')[1], // ምስሉን ብቻ መላክ
+        timestamp: new Date().toLocaleString()
+    };
 
+    if (window.Telegram?.WebApp) {
+        tg.sendData(JSON.stringify(data));
+        showToast("✅ ትዕዛዝዎ ተልኳል!");
+    }
+}
                 if (tg && typeof tg.sendData === 'function') {
                     tg.sendData(JSON.stringify(data));
                     showToast(translations[currentLang].success || "✅ Order Sent!");
