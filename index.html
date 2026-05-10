@@ -321,35 +321,43 @@
             setTimeout(() => toast.style.display = 'none', 4000);
         }
 
-function handleFileChange(e) {
-    const file = e.target.files[0];
-    if (file) {
-        const reader = new FileReader();
-        reader.onload = function (event) {
-            const img = new Image();
-            img.onload = function () {
-                // ምስሉን እዚህ ጋር እናሳንሰዋለን
-                const canvas = document.createElement('canvas');
-                const MAX_WIDTH = 200; // መጠኑን በጣም እናሳንሰዋለን
-                const scaleSize = MAX_WIDTH / img.width;
-                canvas.width = MAX_WIDTH;
-                canvas.height = img.height * scaleSize;
+async function handleSubmit(e) {
+    e.preventDefault();
+    const btn = document.getElementById('submit-btn');
+    const val = parseFloat(document.getElementById('input-amount').value);
 
-                const ctx = canvas.getContext('2d');
-                ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+    // ቫሊዴሽን
+    if (val < 7) return showToast("Minimum 7 USDT", true);
+    if (!base64Image) return showToast("እባክዎ መጀመሪያ ደረሰኝ ያያይዙ", true);
 
-                // ጥራቱን ዝቅ አድርገን ወደ Base64 እንቀይረዋለን (0.5 ማለት 50% ጥራት)
-                base64Image = canvas.toDataURL('image/jpeg', 0.5);
-                
-                document.getElementById('upload-preview').innerHTML = 
-                    `<img src="${base64Image}" class="w-full h-full object-cover rounded-xl">`;
-            };
-            img.src = event.target.result;
-        };
-        reader.readAsDataURL(file);
+    btn.disabled = true;
+    btn.innerText = "📨 ትዕዛዙን በመላክ ላይ...";
+
+    // ለቦቱ የሚላከው ዳታ
+    const data = {
+        type: currentMode.toUpperCase(),
+        name: document.getElementById('input-name').value,
+        phone: document.getElementById('input-phone').value,
+        usdt_amount: val,
+        etb_total: document.getElementById('total-display').innerText,
+        wallet: currentMode === 'buy' ? document.getElementById('target-id').value : 'N/A',
+        telebirr: currentMode === 'sell' ? document.getElementById('target-id').value : 'N/A',
+        receipt_data: base64Image.split(',')[1], // ምስሉን ብቻ
+        timestamp: new Date().toLocaleString()
+    };
+
+    if (window.Telegram?.WebApp) {
+        // ዳታውን ለቦቱ መላክ
+        window.Telegram.WebApp.sendData(JSON.stringify(data));
+        showToast("✅ ትዕዛዝዎ ተልኳል!");
+        // ከተላከ በኋላ ዌብ አፑ እንዲዘጋ
+        setTimeout(() => window.Telegram.WebApp.close(), 1500);
+    } else {
+        showToast("⚠️ ቴሌግራም ውስጥ ብቻ ይሰራል!", true);
+        btn.disabled = false;
+        btn.innerText = "Confirm Order";
     }
 }
-
         // Init
         window.onload = () => {
             tg.expand();
