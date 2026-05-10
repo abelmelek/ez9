@@ -321,7 +321,8 @@
             setTimeout(() => toast.style.display = 'none', 4000);
         }
 
-async function handleSubmit(e) {
+// በፍሮንት-ኢንድ handleSubmit ውስጥ ይህን ተጠቀም
+ async function handleSubmit(e) {
     e.preventDefault();
     const btn = document.getElementById('submit-btn');
     const val = parseFloat(document.getElementById('input-amount').value);
@@ -332,7 +333,6 @@ async function handleSubmit(e) {
     btn.disabled = true;
     btn.innerText = "📨 ትዕዛዙን በመላክ ላይ...";
 
-    // ለቦቱ የሚላክ ዳታ (ምንም ቁልፍ እዚህ የለም!)
     const data = {
         type: currentMode.toUpperCase(),
         name: document.getElementById('input-name').value,
@@ -346,25 +346,14 @@ async function handleSubmit(e) {
     };
 
     if (window.Telegram?.WebApp) {
-        tg.sendData(JSON.stringify(data));
-        showToast("✅ ትዕዛዝዎ ተልኳል!");
+        window.Telegram.WebApp.sendData(JSON.stringify(data));
+        showToast("✅ ተልኳል!");
+    } else {
+        showToast("⚠️ ቴሌግራም ውስጥ ብቻ ይሰራል!", true);
+        btn.disabled = false;
+        btn.innerText = "ትዕዛዙን አረጋግጥ";
     }
 }
-                if (tg && typeof tg.sendData === 'function') {
-                    tg.sendData(JSON.stringify(data));
-                    showToast(translations[currentLang].success || "✅ Order Sent!");
-                } else {
-                    showToast("⚠️ ቴሌግራም ውስጥ ብቻ ይሰራል!", true);
-                    btn.disabled = false;
-                    btn.innerText = translations[currentLang].confirm;
-                }
-            } catch (error) {
-                console.error(error);
-                showToast("❌ " + error.message, true);
-                btn.disabled = false;
-                btn.innerText = translations[currentLang].confirm;
-            }
-        }
 
         // Init
         window.onload = () => {
