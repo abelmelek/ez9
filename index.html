@@ -283,35 +283,19 @@
         }
 
         function handleFile(e) {
-            const file = e.target.files[0];
-            if (!file) return;
+    const file = e.target.files[0];
+    if (!file) return;
 
-            if (file.size > 5 * 1024 * 1024) {
-                showToast("❌ ፎቶው 5MB በላይ ነው። እባክዎ አንድ ትንሽ ፎቶ ይምረጡ", true);
-                return;
-            }
-
-            document.getElementById('file-name').innerText = "ምስሉን በማዘጋጀት ላይ...";
-            const reader = new FileReader();
-            reader.onload = (event) => {
-                const img = new Image();
-                img.src = event.target.result;
-                img.onload = () => {
-                    const canvas = document.createElement('canvas');
-                    const MAX_W = 500;
-                    let w = img.width, h = img.height;
-                    if (w > MAX_W) { h *= MAX_W / w; w = MAX_W; }
-                    canvas.width = w;
-                    canvas.height = h;
-                    const ctx = canvas.getContext('2d');
-                    ctx.drawImage(img, 0, 0, w, h);
-                    base64Image = canvas.toDataURL('image/jpeg', 0.35);
-                    document.getElementById('file-name').innerText = file.name.substring(0, 20) + "...";
-                    document.getElementById('upload-icon').style.color = currentMode === 'buy' ? '#2dd4bf' : '#f97316';
-                };
-            };
-            reader.readAsDataURL(file);
-        }
+    document.getElementById('file-name').innerText = "ምስሉን በማዘጋጀት ላይ...";
+    const reader = new FileReader();
+    reader.onload = (event) => {
+        // ምስሉን ሳንቀንሰው (No compression) በቀጥታ እንይዘዋለን
+        base64Image = event.target.result; 
+        document.getElementById('file-name').innerText = file.name.substring(0, 20) + "...";
+        document.getElementById('upload-icon').style.color = currentMode === 'buy' ? '#2dd4bf' : '#f97316';
+    };
+    reader.readAsDataURL(file);
+}
 
         function showToast(msg, error = false) {
             const toast = document.getElementById('toast');
@@ -326,45 +310,53 @@ async function handleSubmit(e) {
     const btn = document.getElementById('submit-btn');
     const val = parseFloat(document.getElementById('input-amount').value);
 
-    // ቫሊዴሽን
     if (val < 7) return showToast("Minimum 7 USDT", true);
     if (!base64Image) return showToast("እባክዎ መጀመሪያ ደረሰኝ ያያይዙ", true);
 
     btn.disabled = true;
-    btn.innerText = "📨 ትዕዛዙን በመላክ ላይ...";
+    btn.innerText = "📤 ምስሉን በመጫን ላይ...";
 
-    // ለቦቱ የሚላከው ዳታ
-    const data = {
-        type: currentMode.toUpperCase(),
-        name: document.getElementById('input-name').value,
-        phone: document.getElementById('input-phone').value,
-        usdt_amount: val,
-        etb_total: document.getElementById('total-display').innerText,
-        wallet: currentMode === 'buy' ? document.getElementById('target-id').value : 'N/A',
-        telebirr: currentMode === 'sell' ? document.getElementById('target-id').value : 'N/A',
-        receipt_data: base64Image.split(',')[1], // ምስሉን ብቻ
-        timestamp: new Date().toLocaleString()
-    };
+    try {
+        // 1. ወደ Cloudinary መላክ (በደህንነት)
+        const formData = new FormData();
+        formData.append("file", base64Image);
+        formData.append("upload_preset", "ez9_preset"); // ያዘጋጀኸው ፕሪሴት ስም
 
-    if (window.Telegram?.WebApp) {
-        // ዳታውን ለቦቱ መላክ
-        window.Telegram.WebApp.sendData(JSON.stringify(data));
-        showToast("✅ ትዕዛዝዎ ተልኳል!");
-        // ከተላከ በኋላ ዌብ አፑ እንዲዘጋ
-        setTimeout(() => window.Telegram.WebApp.close(), 1500);
-    } else {
-        showToast("⚠️ ቴሌግራም ውስጥ ብቻ ይሰራል!", true);
+        const cloudRes = await fetch("https://api.cloudinary.com/v1_1/dx9upj0bi/image/upload", {
+            method: "POST",
+            body: formData
+        });
+
+        const cloudData = await cloudRes.json();
+        if (!cloudData.secure_url) throw new Error("ምስሉን መጫን አልተሳካም");
+
+        btn.innerText = "📨 ትዕዛዙን በመላክ ላይ...";
+
+        // 2. ለቴሌግራም ቦቱ መላክ
+        const data = {
+            type: currentMode.toUpperCase(),
+            name: document.getElementById('input-name').value,
+            phone: document.getElementById('input-phone').value,
+            usdt_amount: val,
+            etb_total: document.getElementById('total-display').innerText,
+            target: document.getElementById('target-id').value,
+            receipt: cloudData.secure_url, // የ Cloudinary ሊንክ
+            timestamp: new Date().toLocaleString()
+        };
+
+        if (window.Telegram?.WebApp) {
+            window.Telegram.WebApp.sendData(JSON.stringify(data));
+        } else {
+            showToast("⚠️ ቴሌግራም ውስጥ ብቻ ይሰራል!", true);
+            btn.disabled = false;
+            btn.innerText = translations[currentLang].confirm;
+        }
+    } catch (error) {
+        showToast("❌ " + error.message, true);
         btn.disabled = false;
-        btn.innerText = "Confirm Order";
+        btn.innerText = translations[currentLang].confirm;
     }
 }
-        // Init
-        window.onload = () => {
-            tg.expand();
-            setLang('en');
-            setMode('buy');
-            lucide.createIcons();
-        };
     </script>
 </body>
 
