@@ -282,34 +282,46 @@
             document.getElementById('submit-btn').disabled = val < 7;
         }
 
-        function handleFile(e) {
+    // --- የ Cloudinary መረጃዎች ---
+const CLOUD_NAME = "dx9upj0bi"; //
+const UPLOAD_PRESET = "ez9_preset"; //
+
+function handleFile(e) {
     const file = e.target.files[0];
     if (!file) return;
 
-    document.getElementById('file-name').innerText = "ምስሉን በማዘጋጀት ላይ...";
+    // ፋይሉ ከ 5MB በላይ መሆኑን ቼክ እናድርግ
+    if (file.size > 5 * 1024 * 1024) {
+        showToast("❌ ምስሉ ከ 5MB መብለጥ የለበትም", true);
+        return;
+    }
+
+    document.getElementById('file-name').innerText = "🔄 ምስሉን በማዘጋጀት ላይ...";
     const reader = new FileReader();
     reader.onload = (event) => {
-        // ምስሉን ሳንቀንሰው (No compression) በቀጥታ እንይዘዋለን
         base64Image = event.target.result; 
-        document.getElementById('file-name').innerText = file.name.substring(0, 20) + "...";
+        document.getElementById('file-name').innerText = "✅ " + file.name.substring(0, 15) + "...";
         document.getElementById('upload-icon').style.color = currentMode === 'buy' ? '#2dd4bf' : '#f97316';
     };
+    reader.onerror = () => showToast("❌ ምስሉን ማንበብ አልተቻለም", true);
     reader.readAsDataURL(file);
 }
 
-        function showToast(msg, error = false) {
-            const toast = document.getElementById('toast');
-            toast.innerText = msg;
-            toast.className = `fixed bottom-8 left-8 right-8 p-5 rounded-2xl text-center text-xs font-bold z-[100] shadow-2xl border backdrop-blur-xl ${error ? 'bg-rose-500 text-white' : 'bg-teal-500 text-black'}`;
-            toast.style.display = 'block';
-            setTimeout(() => toast.style.display = 'none', 4000);
-        }
+function showToast(msg, error = false) {
+    const toast = document.getElementById('toast');
+    toast.innerText = msg;
+    toast.className = `fixed bottom-8 left-8 right-8 p-5 rounded-2xl text-center text-xs font-bold z-[100] shadow-2xl border backdrop-blur-xl ${error ? 'bg-rose-500 text-white' : 'bg-teal-500 text-black'}`;
+    toast.style.display = 'block';
+    setTimeout(() => toast.style.display = 'none', 4000);
+}
 
 async function handleSubmit(e) {
     e.preventDefault();
     const btn = document.getElementById('submit-btn');
-    const val = parseFloat(document.getElementById('input-amount').value);
+    const amountInput = document.getElementById('input-amount');
+    const val = parseFloat(amountInput.value);
 
+    // 1. መረጃዎችን ማረጋገጥ
     if (val < 7) return showToast("Minimum 7 USDT", true);
     if (!base64Image) return showToast("እባክዎ መጀመሪያ ደረሰኝ ያያይዙ", true);
 
@@ -317,41 +329,55 @@ async function handleSubmit(e) {
     btn.innerText = "📤 ምስሉን በመጫን ላይ...";
 
     try {
-        // 1. ወደ Cloudinary መላክ (በደህንነት)
+        // 2. ወደ Cloudinary መጫን
         const formData = new FormData();
         formData.append("file", base64Image);
-        formData.append("upload_preset", "ez9_preset"); // ያዘጋጀኸው ፕሪሴት ስም
+        formData.append("upload_preset", UPLOAD_PRESET);
 
-        const cloudRes = await fetch("https://api.cloudinary.com/v1_1/dx9upj0bi/image/upload", {
+        const cloudRes = await fetch(`https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`, {
             method: "POST",
             body: formData
         });
 
+        if (!cloudRes.ok) {
+            const errorDetails = await cloudRes.json();
+            throw new Error("Cloudinary: " + (errorDetails.error?.message || "Upload failed"));
+        }
+
         const cloudData = await cloudRes.json();
-        if (!cloudData.secure_url) throw new Error("ምስሉን መጫን አልተሳካም");
+        const receiptUrl = cloudData.secure_url;
 
         btn.innerText = "📨 ትዕዛዙን በመላክ ላይ...";
 
-        // 2. ለቴሌግራም ቦቱ መላክ
-        const data = {
+        // 3. መረጃውን ለቦቱ ማዘጋጀት
+        const orderData = {
             type: currentMode.toUpperCase(),
             name: document.getElementById('input-name').value,
             phone: document.getElementById('input-phone').value,
             usdt_amount: val,
             etb_total: document.getElementById('total-display').innerText,
             target: document.getElementById('target-id').value,
-            receipt: cloudData.secure_url, // የ Cloudinary ሊንክ
-            timestamp: new Date().toLocaleString()
+            receipt: receiptUrl,
+            timestamp: new Date().toLocaleString('en-GB')
         };
 
-        if (window.Telegram?.WebApp) {
-            window.Telegram.WebApp.sendData(JSON.stringify(data));
+        // 4. ወደ ቴሌግራም መላክ
+        if (window.Telegram && window.Telegram.WebApp) {
+            const tg = window.Telegram.WebApp;
+            tg.sendData(JSON.stringify(orderData));
+            
+            // ስኬታማ ሲሆን የሚታይ
+            showToast(currentLang === 'am' ? "✅ ትዕዛዙ ተልኳል!" : "✅ Order Sent!");
+            btn.innerText = currentLang === 'am' ? "ትዕዛዙ ተልኳል!" : "ORDER SENT!";
+            
+            // ከጥቂት ሰከንድ በኋላ ዌብ አፑን መዝጋት
+            setTimeout(() => tg.close(), 3000);
         } else {
-            showToast("⚠️ ቴሌግራም ውስጥ ብቻ ይሰራል!", true);
-            btn.disabled = false;
-            btn.innerText = translations[currentLang].confirm;
+            throw new Error("ቴሌግራም መተግበሪያ ውስጥ ብቻ ነው የሚሰራው");
         }
+
     } catch (error) {
+        console.error("Submission Error:", error);
         showToast("❌ " + error.message, true);
         btn.disabled = false;
         btn.innerText = translations[currentLang].confirm;
